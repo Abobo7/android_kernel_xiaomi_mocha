@@ -1,0 +1,1 @@
+cmd_sound/soc/tegra/snd-soc-tegra-rt5671.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/soc/tegra/snd-soc-tegra-rt5671.o sound/soc/tegra/tegra_rt5671.o ; scripts/mod/modpost sound/soc/tegra/snd-soc-tegra-rt5671.o

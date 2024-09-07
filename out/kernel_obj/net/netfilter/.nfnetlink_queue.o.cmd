@@ -1,0 +1,1 @@
+cmd_net/netfilter/nfnetlink_queue.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/netfilter/nfnetlink_queue.o net/netfilter/nfnetlink_queue_core.o ; scripts/mod/modpost net/netfilter/nfnetlink_queue.o

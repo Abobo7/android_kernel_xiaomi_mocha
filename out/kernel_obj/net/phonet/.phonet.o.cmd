@@ -1,0 +1,1 @@
+cmd_net/phonet/phonet.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/phonet/phonet.o net/phonet/pn_dev.o net/phonet/pn_netlink.o net/phonet/socket.o net/phonet/datagram.o net/phonet/sysctl.o net/phonet/af_phonet.o net/phonet/ld_phonet.o ; scripts/mod/modpost net/phonet/phonet.o

@@ -1,0 +1,1 @@
+cmd_fs/notify/inotify/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o fs/notify/inotify/built-in.o fs/notify/inotify/inotify_fsnotify.o fs/notify/inotify/inotify_user.o ; scripts/mod/modpost fs/notify/inotify/built-in.o

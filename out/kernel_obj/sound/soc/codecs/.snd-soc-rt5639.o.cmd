@@ -1,0 +1,1 @@
+cmd_sound/soc/codecs/snd-soc-rt5639.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/soc/codecs/snd-soc-rt5639.o sound/soc/codecs/rt5639.o sound/soc/codecs/rt56xx_ioctl.o sound/soc/codecs/rt5639_ioctl.o ; scripts/mod/modpost sound/soc/codecs/snd-soc-rt5639.o

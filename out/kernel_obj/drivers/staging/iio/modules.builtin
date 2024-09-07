@@ -1,0 +1,7 @@
+kernel/drivers/staging/iio/adc/as3722-adc-extcon.ko
+kernel/drivers/staging/iio/adc/palmas_gpadc.ko
+kernel/drivers/staging/iio/light/cm3218.ko
+kernel/drivers/staging/iio/light/jsa1127.ko
+kernel/drivers/staging/iio/light/max44005.ko
+kernel/drivers/staging/iio/light/stm8t143.ko
+kernel/drivers/staging/iio/light/cm3217.ko

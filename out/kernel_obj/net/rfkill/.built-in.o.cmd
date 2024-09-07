@@ -1,0 +1,1 @@
+cmd_net/rfkill/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/rfkill/built-in.o net/rfkill/rfkill.o net/rfkill/rfkill-gpio.o ; scripts/mod/modpost net/rfkill/built-in.o

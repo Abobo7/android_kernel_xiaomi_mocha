@@ -1,0 +1,1 @@
+cmd_arch/arm/common/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o arch/arm/common/built-in.o arch/arm/common/firmware.o arch/arm/common/fiq_debugger.o arch/arm/common/fiq_glue.o arch/arm/common/fiq_glue_setup.o ; scripts/mod/modpost arch/arm/common/built-in.o

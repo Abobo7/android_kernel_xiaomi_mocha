@@ -1,0 +1,2 @@
+tegra30-cardhu-a02.o: \
+ /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/tegra30-cardhu-a02.dts

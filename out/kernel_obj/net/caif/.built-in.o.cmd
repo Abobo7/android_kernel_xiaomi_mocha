@@ -1,0 +1,1 @@
+cmd_net/caif/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/caif/built-in.o net/caif/caif.o net/caif/chnl_net.o net/caif/caif_socket.o ; scripts/mod/modpost net/caif/built-in.o

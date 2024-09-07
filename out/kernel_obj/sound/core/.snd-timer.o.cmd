@@ -1,0 +1,1 @@
+cmd_sound/core/snd-timer.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/core/snd-timer.o sound/core/timer.o ; scripts/mod/modpost sound/core/snd-timer.o

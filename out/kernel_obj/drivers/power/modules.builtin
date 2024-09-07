@@ -1,0 +1,9 @@
+kernel/drivers/power/sbs-battery.ko
+kernel/drivers/power/bq2419x-charger.ko
+kernel/drivers/power/bq2471x-charger.ko
+kernel/drivers/power/bq2477x-charger.ko
+kernel/drivers/power/bq27x00_battery.ko
+kernel/drivers/power/max77665-charger.ko
+kernel/drivers/power/gpio-charger.ko
+kernel/drivers/power/max77660-charger-extcon.ko
+kernel/drivers/power/cw201x_battery.ko

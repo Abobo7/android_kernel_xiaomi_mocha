@@ -1,0 +1,1 @@
+cmd_sound/soc/tegra/snd-soc-tegra30-i2s.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/soc/tegra/snd-soc-tegra30-i2s.o sound/soc/tegra/tegra30_i2s.o ; scripts/mod/modpost sound/soc/tegra/snd-soc-tegra30-i2s.o

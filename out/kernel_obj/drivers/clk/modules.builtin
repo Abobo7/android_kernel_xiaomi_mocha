@@ -1,0 +1,2 @@
+kernel/drivers/clk/clk-as3722.ko
+kernel/drivers/clk/clk-palmas.ko

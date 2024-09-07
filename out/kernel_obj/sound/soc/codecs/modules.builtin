@@ -1,0 +1,4 @@
+kernel/sound/soc/codecs/snd-soc-spdif-rx.ko
+kernel/sound/soc/codecs/snd-soc-spdif-tx.ko
+kernel/sound/soc/codecs/snd-soc-tfa98xx.ko
+kernel/sound/soc/codecs/snd-soc-rt5671.ko

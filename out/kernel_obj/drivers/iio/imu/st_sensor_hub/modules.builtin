@@ -1,0 +1,13 @@
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_accel.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_magn.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_magn_uncalib.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_gyro.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_gyro_uncalib.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_sign_motion.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_quaternion.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_step_detector.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_step_counter.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_euler.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_linear.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_hub_gravity.ko
+kernel/drivers/iio/imu/st_sensor_hub/st_sensor_hub_core.ko

@@ -1,0 +1,1 @@
+cmd_block/partitions/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o block/partitions/built-in.o block/partitions/check.o block/partitions/msdos.o block/partitions/efi.o ; scripts/mod/modpost block/partitions/built-in.o

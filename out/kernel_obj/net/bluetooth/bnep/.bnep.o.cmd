@@ -1,0 +1,1 @@
+cmd_net/bluetooth/bnep/bnep.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/bluetooth/bnep/bnep.o net/bluetooth/bnep/core.o net/bluetooth/bnep/sock.o net/bluetooth/bnep/netdev.o ; scripts/mod/modpost net/bluetooth/bnep/bnep.o

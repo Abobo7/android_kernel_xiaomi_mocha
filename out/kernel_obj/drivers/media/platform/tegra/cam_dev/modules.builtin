@@ -1,0 +1,4 @@
+kernel/drivers/media/platform/tegra/cam_dev/dev_access.ko
+kernel/drivers/media/platform/tegra/cam_dev/debugfs.ko
+kernel/drivers/media/platform/tegra/cam_dev/virtual.ko
+kernel/drivers/media/platform/tegra/cam_dev/edp.ko

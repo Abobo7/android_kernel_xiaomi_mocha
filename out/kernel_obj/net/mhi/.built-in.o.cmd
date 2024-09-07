@@ -1,0 +1,1 @@
+cmd_net/mhi/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/mhi/built-in.o net/mhi/af_mhi.o net/mhi/l2mux.o net/mhi/l3mhi.o net/mhi/l3mhdp.o net/mhi/l3phonet.o ; scripts/mod/modpost net/mhi/built-in.o

@@ -1,0 +1,2 @@
+kernel/drivers/watchdog/max77660_sys_wdt.ko
+kernel/drivers/watchdog/tegra_wdt.ko

@@ -1,0 +1,9 @@
+kernel/drivers/input/touchscreen/rmi4/rmi_core.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_f1a.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_f11.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_f19.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_f31.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_f34.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_f54.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_spi.ko
+kernel/drivers/input/touchscreen/rmi4/rmi_dev.ko

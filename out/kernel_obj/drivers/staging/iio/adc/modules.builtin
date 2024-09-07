@@ -1,0 +1,2 @@
+kernel/drivers/staging/iio/adc/as3722-adc-extcon.ko
+kernel/drivers/staging/iio/adc/palmas_gpadc.ko

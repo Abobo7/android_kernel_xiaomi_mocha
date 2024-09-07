@@ -1,0 +1,1 @@
+cmd_fs/nls/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o fs/nls/built-in.o fs/nls/nls_base.o fs/nls/nls_cp437.o fs/nls/nls_cp936.o fs/nls/nls_cp950.o fs/nls/nls_ascii.o fs/nls/nls_iso8859-1.o fs/nls/nls_utf8.o ; scripts/mod/modpost fs/nls/built-in.o

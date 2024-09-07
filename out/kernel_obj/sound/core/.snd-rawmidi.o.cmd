@@ -1,0 +1,1 @@
+cmd_sound/core/snd-rawmidi.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/core/snd-rawmidi.o sound/core/rawmidi.o ; scripts/mod/modpost sound/core/snd-rawmidi.o

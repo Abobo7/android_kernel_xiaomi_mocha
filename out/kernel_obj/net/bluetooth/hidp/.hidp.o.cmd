@@ -1,0 +1,1 @@
+cmd_net/bluetooth/hidp/hidp.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/bluetooth/hidp/hidp.o net/bluetooth/hidp/core.o net/bluetooth/hidp/sock.o ; scripts/mod/modpost net/bluetooth/hidp/hidp.o

@@ -1,0 +1,1 @@
+cmd_crypto/crypto_algapi.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o crypto/crypto_algapi.o crypto/algapi.o crypto/scatterwalk.o crypto/proc.o ; scripts/mod/modpost crypto/crypto_algapi.o

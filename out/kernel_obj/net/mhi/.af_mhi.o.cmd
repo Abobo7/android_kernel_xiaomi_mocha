@@ -1,0 +1,1 @@
+cmd_net/mhi/af_mhi.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/mhi/af_mhi.o net/mhi/mhi_proto.o net/mhi/mhi_socket.o net/mhi/mhi_dgram.o net/mhi/mhi_raw.o ; scripts/mod/modpost net/mhi/af_mhi.o

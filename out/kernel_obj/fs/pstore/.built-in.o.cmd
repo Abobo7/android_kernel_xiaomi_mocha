@@ -1,0 +1,1 @@
+cmd_fs/pstore/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o fs/pstore/built-in.o fs/pstore/pstore.o fs/pstore/ramoops.o ; scripts/mod/modpost fs/pstore/built-in.o

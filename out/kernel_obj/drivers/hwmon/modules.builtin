@@ -1,0 +1,4 @@
+kernel/drivers/hwmon/hwmon.ko
+kernel/drivers/hwmon/ina219.ko
+kernel/drivers/hwmon/ina230.ko
+kernel/drivers/hwmon/ina3221.ko

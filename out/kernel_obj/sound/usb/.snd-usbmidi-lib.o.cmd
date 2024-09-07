@@ -1,0 +1,1 @@
+cmd_sound/usb/snd-usbmidi-lib.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/usb/snd-usbmidi-lib.o sound/usb/midi.o ; scripts/mod/modpost sound/usb/snd-usbmidi-lib.o

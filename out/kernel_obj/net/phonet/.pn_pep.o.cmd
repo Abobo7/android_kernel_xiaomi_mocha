@@ -1,0 +1,1 @@
+cmd_net/phonet/pn_pep.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/phonet/pn_pep.o net/phonet/pep.o net/phonet/pep-gprs.o ; scripts/mod/modpost net/phonet/pn_pep.o

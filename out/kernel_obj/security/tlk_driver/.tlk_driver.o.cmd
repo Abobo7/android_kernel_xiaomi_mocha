@@ -1,0 +1,1 @@
+cmd_security/tlk_driver/tlk_driver.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o security/tlk_driver/tlk_driver.o security/tlk_driver/ote_device.o security/tlk_driver/ote_comms.o security/tlk_driver/ote_fs.o security/tlk_driver/ote_irq.o security/tlk_driver/ote_log.o ; scripts/mod/modpost security/tlk_driver/tlk_driver.o

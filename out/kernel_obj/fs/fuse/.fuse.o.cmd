@@ -1,0 +1,1 @@
+cmd_fs/fuse/fuse.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o fs/fuse/fuse.o fs/fuse/dev.o fs/fuse/dir.o fs/fuse/file.o fs/fuse/inode.o fs/fuse/control.o ; scripts/mod/modpost fs/fuse/fuse.o

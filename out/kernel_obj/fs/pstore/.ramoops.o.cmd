@@ -1,0 +1,1 @@
+cmd_fs/pstore/ramoops.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o fs/pstore/ramoops.o fs/pstore/ram.o fs/pstore/ram_core.o ; scripts/mod/modpost fs/pstore/ramoops.o

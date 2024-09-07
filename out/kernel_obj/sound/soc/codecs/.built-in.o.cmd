@@ -1,0 +1,1 @@
+cmd_sound/soc/codecs/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/soc/codecs/built-in.o sound/soc/codecs/snd-soc-spdif-rx.o sound/soc/codecs/snd-soc-spdif-tx.o sound/soc/codecs/snd-soc-tfa98xx.o sound/soc/codecs/snd-soc-rt5671.o ; scripts/mod/modpost sound/soc/codecs/built-in.o

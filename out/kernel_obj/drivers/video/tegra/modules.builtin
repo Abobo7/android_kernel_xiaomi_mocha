@@ -1,0 +1,12 @@
+kernel/drivers/video/tegra/fb.ko
+kernel/drivers/video/tegra/host/gk20a/nvhost-gk20a.ko
+kernel/drivers/video/tegra/host/gr2d/nvhost-gr2d.ko
+kernel/drivers/video/tegra/host/gr3d/nvhost-gr3d.ko
+kernel/drivers/video/tegra/host/host1x/nvhost-host1x.ko
+kernel/drivers/video/tegra/host/isp/nvhost-isp.ko
+kernel/drivers/video/tegra/host/msenc/nvhost-msenc.ko
+kernel/drivers/video/tegra/host/t114/nvhost-t114.ko
+kernel/drivers/video/tegra/host/t124/nvhost-t124.ko
+kernel/drivers/video/tegra/host/t148/nvhost-t148.ko
+kernel/drivers/video/tegra/host/tsec/nvhost-tsec.ko
+kernel/drivers/video/tegra/host/vi/nvhost-vi.ko

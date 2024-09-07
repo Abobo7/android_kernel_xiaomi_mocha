@@ -1,0 +1,1 @@
+cmd_crypto/crypto_blkcipher.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o crypto/crypto_blkcipher.o crypto/ablkcipher.o crypto/blkcipher.o ; scripts/mod/modpost crypto/crypto_blkcipher.o

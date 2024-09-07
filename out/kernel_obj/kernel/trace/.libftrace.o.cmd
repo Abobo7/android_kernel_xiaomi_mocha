@@ -1,0 +1,1 @@
+cmd_kernel/trace/libftrace.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o kernel/trace/libftrace.o kernel/trace/ftrace.o ; scripts/mod/modpost kernel/trace/libftrace.o

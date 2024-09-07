@@ -1,0 +1,1 @@
+cmd_net/wireless/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o net/wireless/built-in.o net/wireless/cfg80211.o ; scripts/mod/modpost net/wireless/built-in.o

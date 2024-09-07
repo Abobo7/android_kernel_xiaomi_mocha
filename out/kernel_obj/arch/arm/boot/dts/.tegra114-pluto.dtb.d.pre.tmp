@@ -1,0 +1,7 @@
+tegra114-pluto.o: \
+ /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/tegra114-pluto.dts \
+ /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/tegra114-platforms/tegar114-pluto-e1580-gpio-default.dtsi \
+ /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/include/dt-bindings/gpio/tegra-gpio.h \
+ /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/include/dt-bindings/gpio/gpio.h \
+ /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/tegra114-platforms/tegar114-pluto-e1580-pinmux.dtsi \
+ /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/include/dt-bindings/pinctrl/pinctrl-tegra.h

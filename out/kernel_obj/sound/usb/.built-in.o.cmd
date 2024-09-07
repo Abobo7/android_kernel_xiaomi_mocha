@@ -1,0 +1,1 @@
+cmd_sound/usb/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/usb/built-in.o sound/usb/snd-usb-audio.o sound/usb/snd-usbmidi-lib.o sound/usb/misc/built-in.o sound/usb/usx2y/built-in.o sound/usb/caiaq/built-in.o sound/usb/6fire/built-in.o ; scripts/mod/modpost sound/usb/built-in.o

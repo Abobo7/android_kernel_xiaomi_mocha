@@ -1,0 +1,5 @@
+kernel/net/mhi/af_mhi.ko
+kernel/net/mhi/l2mux.ko
+kernel/net/mhi/l3mhi.ko
+kernel/net/mhi/l3mhdp.ko
+kernel/net/mhi/l3phonet.ko

@@ -1,0 +1,1 @@
+arch/arm/boot/dts/tegra114-pluto.dtb: arch/arm/boot/dts/.tegra114-pluto.dtb.dts /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/tegra114.dtsi /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/skeleton.dtsi /home/abobo/桌面/android_kernel_xiaomi_mocha/arch/arm/boot/dts/panel-l-720p-5.dts

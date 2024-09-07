@@ -1,0 +1,2 @@
+kernel/drivers/usb/misc/boot_hsic_class.ko
+kernel/drivers/usb/misc/usb_nvshieldled.ko

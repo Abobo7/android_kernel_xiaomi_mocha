@@ -1,0 +1,1 @@
+cmd_sound/pci/hda/snd-hda-intel.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o sound/pci/hda/snd-hda-intel.o sound/pci/hda/hda_intel.o ; scripts/mod/modpost sound/pci/hda/snd-hda-intel.o

@@ -1,0 +1,1 @@
+cmd_fs/nfs/nfsv3.o := /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o fs/nfs/nfsv3.o fs/nfs/nfs3super.o fs/nfs/nfs3client.o fs/nfs/nfs3proc.o fs/nfs/nfs3xdr.o ; scripts/mod/modpost fs/nfs/nfsv3.o

@@ -1,0 +1,1 @@
+cmd_arch/arm/oprofile/built-in.o :=  /home/abobo/桌面/android_kernel_xiaomi_mocha/tc/bin/arm-linux-gnueabihf-ld -EL   -r -o arch/arm/oprofile/built-in.o arch/arm/oprofile/oprofile.o ; scripts/mod/modpost arch/arm/oprofile/built-in.o
