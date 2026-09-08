@@ -35,6 +35,8 @@
 #include <linux/device.h>
 #include <linux/cdev.h>
 #include <linux/poll.h>
+#include <linux/aio.h>
+#include <linux/uio.h>
 #include "../include/v4l2_target.h"
 #include "../include/brcm_ldisc_sh.h"
 #include "../include/v4l2_logs.h"
@@ -244,8 +246,6 @@ static void brcm_bt_drv_prepare(struct brcm_bt_dev* bt_dev)
     skb_queue_head_init(&bt_dev->rx_q);
     spin_lock_init(&bt_dev->rx_q_lock);
 
-    atomic_set(&bt_dev->tx_cnt, 0);
-
     init_waitqueue_head(&bt_dev->inq);
 
     return;
@@ -285,7 +285,6 @@ static int brcm_bt_drv_close(struct inode *i, struct file *f)
 
     skb_queue_purge(&bt_dev_p->tx_q);
     skb_queue_purge(&bt_dev_p->rx_q);
-    atomic_set(&bt_dev_p->tx_cnt, 0);
     bt_dev_p->st_write = NULL;
 
     BT_DRV_DBG(V4L2_DBG_CLOSE, "End ret=%d", err);
@@ -297,103 +296,105 @@ static int brcm_bt_drv_close(struct inode *i, struct file *f)
 **
 ** Function - brcm_bt_drv_read
 **
-** Description - Called when user-space program tries to read a packet.
+** Description - Read bytes from the queued H4 packets.
 **
-** Returns - Number of bytes in packet.
+** Returns - Number of bytes copied, never more than the requested length.
 *****************************************************************************/
 static ssize_t brcm_bt_drv_read(struct file *f, char __user *buf, size_t
   len, loff_t *off)
 {
     struct sk_buff *skb;
     struct brcm_bt_dev *bt_dev_p = f->private_data;
-    size_t skb_size = 0;
+    size_t count, copied;
+    ssize_t ret;
     unsigned long flags;
 
-    spin_lock_irqsave(&bt_dev_p->rx_q_lock, flags);
-    skb = skb_peek(&bt_dev_p->rx_q);
+    if (!len)
+        return 0;
 
-    if(!skb)
-    {
-        skb_size = 0;
-        BT_DRV_ERR("No skb packet in rx queue. This should " \
-            "not happen as user-space program should poll for data "\
-            "availability before reading");
-        goto exit;
-    }
-    else {
-        skb_size = skb->len;
+    if (mutex_lock_interruptible(&bt_dev_p->read_lock))
+        return -ERESTARTSYS;
 
-         /* copy packet to user-space */
-         if(copy_to_user(buf, skb->data, sizeof(char) * skb_size)){
-            /* free the skb */
-            /*kfree_skb(skb);*/
-            printk("copy to user failed\n");
-            spin_unlock_irqrestore(&bt_dev_p->rx_q_lock, flags);
-            return -EFAULT;
-         }
-         else {
-            /* free the skb after copying to user space. Return the size of skb */
-            skb = skb_dequeue(&bt_dev_p->rx_q);
-            kfree_skb(skb);
-            spin_unlock_irqrestore(&bt_dev_p->rx_q_lock, flags);
-            return skb_size;
-         }
+    for (;;) {
+        spin_lock_irqsave(&bt_dev_p->rx_q_lock, flags);
+        skb = skb_dequeue(&bt_dev_p->rx_q);
+        spin_unlock_irqrestore(&bt_dev_p->rx_q_lock, flags);
+        if (skb)
+            break;
+        if (f->f_flags & O_NONBLOCK) {
+            ret = -EAGAIN;
+            goto out;
+        }
+        ret = wait_event_interruptible(bt_dev_p->inq,
+                                      !skb_queue_empty(&bt_dev_p->rx_q));
+        if (ret)
+            goto out;
     }
 
-exit:
-         spin_unlock_irqrestore(&bt_dev_p->rx_q_lock, flags);
-         BT_DRV_DBG(V4L2_DBG_RX, "skb_size=%d", skb_size);
-         return skb_size;
+    /* H4 reads the type, header and payload separately. Preserve the tail
+     * for the next read, including bytes not copied on a userspace fault.
+     * copy_to_user may sleep, so it must run outside the queue spinlock.
+     */
+    count = min_t(size_t, len, skb->len);
+    copied = count - copy_to_user(buf, skb->data, count);
+    skb_pull(skb, copied);
+    if (skb->len) {
+        spin_lock_irqsave(&bt_dev_p->rx_q_lock, flags);
+        skb_queue_head(&bt_dev_p->rx_q, skb);
+        spin_unlock_irqrestore(&bt_dev_p->rx_q_lock, flags);
+        wake_up_interruptible(&bt_dev_p->inq);
+    } else {
+        kfree_skb(skb);
+    }
+    ret = copied ? (ssize_t)copied : -EFAULT;
+out:
+    mutex_unlock(&bt_dev_p->read_lock);
+    return ret;
 }
 
 
 /*****************************************************************************
 **
-** Function - brcm_bt_write
+** Function - brcm_bt_drv_aio_write
 **
-** Description - Called when user-space program writes to fd.
+** Description - Queue one complete H4 packet from write or writev.
 **
 ** Returns - Number of bytes written.
 *****************************************************************************/
-static ssize_t brcm_bt_write(struct file *f, const char __user *buf,
-  size_t len, loff_t *off)
+static ssize_t brcm_bt_drv_aio_write(struct kiocb *iocb,
+  const struct iovec *iov, unsigned long nr_segs, loff_t off)
 {
-    int ret=0;
     struct sk_buff *skb;
-    struct brcm_bt_dev *bt_dev;
+    struct brcm_bt_dev *bt_dev = iocb->ki_filp->private_data;
+    size_t len = iov_length(iov, nr_segs);
+    unsigned long seg;
     unsigned long flags;
 
-    bt_dev = f->private_data;
-    spin_lock_irqsave(&bt_dev->tx_q_lock, flags);
+    if (!len)
+        return 0;
 
-    if (buf != NULL)
-    {
-        if(!(skb = alloc_skb(len, GFP_ATOMIC)))
-        {
-            BT_DRV_ERR("Error in allocating memory for skb\n");
-            ret=-EFAULT;
-            goto nomem;
+    /* VFS has validated the vector lengths. H4 sends its type and payload
+     * in separate iovecs; the shared transport requires one whole packet.
+     * Without aio_write, VFS calls write once per iovec, splitting the frame.
+     * Allocate/copy before taking the queue lock: user faults may sleep.
+     */
+    skb = alloc_skb(len, GFP_KERNEL);
+    if (!skb)
+        return -ENOMEM;
+    for (seg = 0; seg < nr_segs; seg++) {
+        if (!iov[seg].iov_len)
+            continue;
+        if (copy_from_user(skb_put(skb, iov[seg].iov_len),
+                           iov[seg].iov_base, iov[seg].iov_len)) {
+            kfree_skb(skb);
+            return -EFAULT;
         }
-
-        if(copy_from_user(skb_put(skb, len), buf, len))
-        {
-            BT_DRV_ERR("Error:Could not copy all data bytes from user space\n");
-            ret=-EFAULT;
-            goto nomem;
-        }
-
-    }
-    else {
-        BT_DRV_ERR("Error: Buffer from user space is NULL\n");
-        ret=-EFAULT;
-        goto nomem;
     }
 
     /* writing to tx queue should be atomic */
+    spin_lock_irqsave(&bt_dev->tx_q_lock, flags);
     skb_queue_tail(&bt_dev->tx_q, skb);
     spin_unlock_irqrestore(&bt_dev->tx_q_lock, flags);
-
-    atomic_inc(&bt_dev->tx_cnt);
 
 #ifdef TASKLET_SUPPORT
     tasklet_schedule(&bt_dev->tx_task);
@@ -403,11 +404,6 @@ static ssize_t brcm_bt_write(struct file *f, const char __user *buf,
 
     BT_DRV_DBG(V4L2_DBG_TX, "End len=%d", len);
     return len;
-
-nomem:
-     spin_unlock_irqrestore(&bt_dev->tx_q_lock, flags);
-     BT_DRV_DBG(V4L2_DBG_TX, "End ret=%d", ret);
-     return ret;
 }
 
 
@@ -470,39 +466,30 @@ static void bt_send_data_ldisc(struct work_struct *w)
 #endif
 
     struct sk_buff *skb;
-    int len = 0;
+    long len;
     unsigned long flags;
 
     BT_DRV_DBG(V4L2_DBG_TX, "sending data to ldisc");
 
-    if (atomic_read(&bt_dev_p->tx_cnt))
-    {
+    /* queue_work/tasklet_schedule can coalesce multiple writers. Drain the
+     * queue so the last packet never waits for a later write to kick it.
+     */
+    for (;;) {
         spin_lock_irqsave(&bt_dev_p->tx_q_lock, flags);
         skb = skb_dequeue(&bt_dev_p->tx_q);
         spin_unlock_irqrestore(&bt_dev_p->tx_q_lock, flags);
-        if (skb)
-        {
-            sh_ldisc_cb(skb)->pkt_type = skb->data[0];
+        if (!skb)
+            break;
 
-            if(bt_dev_p->st_write != NULL){
-                len = bt_dev_p->st_write(skb);
-            }
-            else
-            {
-                BT_DRV_ERR("%s Error!!! bt_dev_p->st_write is NULL", __func__);
-            }
+        sh_ldisc_cb(skb)->pkt_type = skb->data[0];
+        if (bt_dev_p->st_write)
+            len = bt_dev_p->st_write(skb);
+        else
+            len = -ENODEV;
 
-            if(len < 0)
-            {
-                kfree_skb(skb);
-                BT_DRV_ERR("Error!!! sending skb to ldisc_write from \
-                    send_tasklet. Packet dropped");
-                atomic_set(&bt_dev_p->tx_cnt, 0);
-            }
-            else
-            {
-                atomic_dec(&bt_dev_p->tx_cnt);
-            }
+        if (len < 0) {
+            kfree_skb(skb);
+            BT_DRV_ERR("Error sending packet to ldisc: %ld", len);
         }
     }
 }
@@ -515,7 +502,8 @@ static struct file_operations brcm_bt_drv_fops =
   .open = brcm_bt_drv_open,
   .release = brcm_bt_drv_close,
   .read = brcm_bt_drv_read,
-  .write = brcm_bt_write,
+  .write = do_sync_write,
+  .aio_write = brcm_bt_drv_aio_write,
   .poll = brcm_bt_drv_poll
 };
 
@@ -626,6 +614,7 @@ static int __init brcm_bt_drv_init(void) /* Constructor */
     }
 
     memset(bt_dev_p, 0, sizeof(struct brcm_bt_dev));
+    mutex_init(&bt_dev_p->read_lock);
 
     if ((bt_dev_p->cl \
            = (struct class *)class_create(THIS_MODULE, "brcm_bt_drv")) == NULL)

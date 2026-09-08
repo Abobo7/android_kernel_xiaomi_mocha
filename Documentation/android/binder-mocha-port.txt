@@ -1,0 +1,28 @@
+Android 8.1 Binder support for mocha
+==================================
+
+The Binder driver, trace definitions, Kconfig and UAPI header are taken from
+LineageOS/android_kernel_nvidia_shield, lineage-15.1, commit
+4cc46ead (fs/exec: fix use after free in execve).
+
+These are generic Android IPC sources for the Tegra 3.10 kernel family. No
+NVIDIA device drivers, device trees or proprietary binaries are imported.
+
+The port provides independent binder, hwbinder and vndbinder contexts and
+scatter-gather transactions used by Android 8.1 HIDL. mocha retains the 32-bit
+Binder protocol used by its stock libraries; Android userspace must continue
+to build with Binder32bit enabled.
+
+The imported shield header omitted the explicit padding word in
+binder_fd_array_object. On a 64-bit Binder ABI the compiler inserts equivalent
+padding, but on mocha's 32-bit ABI it made the kernel read the 20-byte HIDL
+object as 16 bytes. Android 8.1 libhwbinder/include/hwbinder/binder_kernel.h
+requires num_fds, parent and parent_offset at offsets 8, 12 and 16. Preserve
+the explicit __u32 padding word for both protocols; no alignment validation
+or descriptor security checks are removed.
+
+Real-device evidence before this correction: the graphics allocator's native
+handle reply is rejected with "parent offset not aligned correctly", followed
+by a failed GraphicBuffer allocation and an EGL_BAD_SURFACE abort. Regression
+coverage must include allocation through the HIDL graphics service, FD import,
+CPU mapping and pixel readback, not only BINDER_VERSION or no-FD transactions.

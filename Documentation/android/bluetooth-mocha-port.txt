@@ -1,0 +1,33 @@
+mocha Broadcom H4 character transport on Android 8.1
+==================================================
+
+The stock vendor library opens /dev/brcm_bt_drv. Android's Bluetooth HIDL
+H4Protocol reads type/header/payload separately and sends type/payload with
+writev. The shared Broadcom line discipline expects complete transmit packets.
+
+RX (iteration 10): bound each copy to the requested count, retain the unread
+skb tail, serialize readers, and perform user copies outside spinlocks. Empty
+nonblocking reads return EAGAIN; zero-length reads return zero. Partial user
+copy faults consume only the bytes actually copied.
+
+TX (iteration 11): provide aio_write so VFS preserves the whole writev rather
+than invoking write once per iovec. do_sync_write uses the same path for scalar
+writes. Copy all vectors to one skb before enqueueing; return zero without
+enqueueing for an empty write and discard the entire skb on a user-copy fault.
+The worker drains the queue because queue_work can coalesce wakeups. A separate
+packet counter is unnecessary and can race with the queue.
+
+Device evidence from the unchanged iteration 10 ROM:
+  boot UUID 04fac489-44ae-4ffe-ba73-eaf473f279bb
+  05:46:47.538908 writev(fd6, [01], [03 0c 00]) = 4 (HCI Reset)
+  05:46:49.541862 writev(fd6, [01], [5b fd 00]) = 4 (timeout dump request)
+  05:46:49.545241 read(fd6, [04], 1) = 1
+  05:46:49.545748 read(fd6, [0e 04], 2) = 2
+  05:46:49.546071 read(fd6, [01 03 0c 00], 4) = 4 (Reset completion)
+The queued Reset only completed after the next write. The source's one-skb
+worker and VFS fallback explain that observed delay. Full syscall/logcat
+evidence is kept in diagnostics/20260907-boot-fix/attempt-10-device/bluetooth-trace.
+
+Runtime acceptance requires normal controller initialization, a valid address,
+Bluetooth ON, no HCI command timeout/crash loop, and an off/on cycle. A clean
+build is insufficient. Preserve the stock vendor library and recovery image.

@@ -849,6 +849,7 @@ void key_change_session_keyring(struct callback_head *twork)
 	new->cap_permitted	= old->cap_permitted;
 	new->cap_effective	= old->cap_effective;
 	new->cap_bset		= old->cap_bset;
+	new->cap_ambient	= old->cap_ambient;
 
 	new->jit_keyring	= old->jit_keyring;
 	new->thread_keyring	= key_get(old->thread_keyring);

@@ -1,0 +1,26 @@
+Ambient capabilities for Android 8.1
+====================================
+
+Sources:
+  Linux 58319057b7847667f0c9585b9de0e8932b0fdb08
+    "capabilities: ambient capabilities"
+  Linux 746bf6d64275be0c65b0631d8a72b16f1454cfa1
+    "capabilities: add a securebit to disable PR_CAP_AMBIENT_RAISE"
+
+Android 8.1's debuggerd handler raises ambient capabilities before executing
+crash_dump. Without this API, a non-root daemon with capabilities (for example
+SurfaceFlinger with CAP_SYS_NICE) loses those capabilities in the helper;
+ptrace's capability-subset check then refuses the dump. The captured Android
+log shows PR_CAP_AMBIENT_RAISE returning EINVAL followed by ptrace EPERM.
+Init also uses ambient capabilities for services with a capabilities stanza.
+
+Adaptations to this 3.10 tree:
+  - Keep cap_task_prctl's existing prepare_creds / changed / no_change cleanup
+    flow. Upstream allocates credentials inside each case; copying its return
+    statements verbatim here would leak the already allocated credentials.
+  - Normalize CapAmb in /proc/PID/status along with the existing capability
+    sets in this Android kernel.
+
+The permitted/inheritable subset invariant, clearing on setid/file-cap exec
+and UID transitions, user-namespace reset, keyring credential copying and the
+locked securebit are retained. No ptrace permission check is bypassed.

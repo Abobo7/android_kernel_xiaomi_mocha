@@ -30,6 +30,7 @@
 #define _BT_DRV_H
 #include <net/bluetooth/bluetooth.h>
 #include <linux/interrupt.h>
+#include <linux/mutex.h>
 
 #define TRUE   1
 #define FALSE  0
@@ -74,6 +75,7 @@ struct brcm_bt_dev {
     long flag;                           /*  BT driver state machine info */
     struct sk_buff_head rx_q;            /* RX queue */
     spinlock_t rx_q_lock;                /* Rx queue lock */
+    struct mutex read_lock;              /* Serialize partial packet reads */
 
     struct sk_buff_head tx_q;            /* TX queue */
 #ifdef TASKLET_SUPPORT
@@ -85,7 +87,6 @@ struct brcm_bt_dev {
     spinlock_t tx_q_lock;                /* Tx queue lock */
 
     unsigned long last_tx_jiffies;       /* Timestamp of last pkt sent */
-    atomic_t tx_cnt;                     /* Number of packets in tx queue */
 
     /* queue for polling table */
     wait_queue_head_t inq;
@@ -104,8 +105,8 @@ static void brcm_bt_drv_prepare(struct brcm_bt_dev* bt_dev);
 static ssize_t brcm_bt_drv_read(struct file *f, char __user *buf, size_t
   len, loff_t *off);
 
-static ssize_t brcm_bt_write(struct file *f, const char __user *buf,
-  size_t len, loff_t *off);
+static ssize_t brcm_bt_drv_aio_write(struct kiocb *iocb,
+  const struct iovec *iov, unsigned long nr_segs, loff_t off);
 
 static void brcm_bt_st_registration_completion_cb(void *priv_data,
     char data);
