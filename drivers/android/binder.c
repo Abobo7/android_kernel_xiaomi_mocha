@@ -3377,7 +3377,7 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	const char *failure_string;
 	struct binder_buffer *buffer;
 
-	if (proc->tsk != current)
+	if (proc->tsk != current->group_leader)
 		return -EINVAL;
 
 	if ((vma->vm_end - vma->vm_start) > SZ_4M)
@@ -3478,8 +3478,13 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	proc = kzalloc(sizeof(*proc), GFP_KERNEL);
 	if (proc == NULL)
 		return -ENOMEM;
-	get_task_struct(current);
-	proc->tsk = current;
+	/*
+	 * HIDL may open the driver from a short-lived initialization thread.
+	 * Keep the process leader: the opener drops its files/mm on exit even
+	 * while other threads still use this binder_proc to receive FD replies.
+	 */
+	proc->tsk = current->group_leader;
+	get_task_struct(proc->tsk);
 	proc->vma_vm_mm = current->mm;
 	INIT_LIST_HEAD(&proc->todo);
 	init_waitqueue_head(&proc->wait);

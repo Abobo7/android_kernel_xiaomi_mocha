@@ -1,0 +1,34 @@
+Binder FD delivery after an initialization thread exits
+======================================================
+
+Mocha / Android 8.1, 2026-09-09
+
+The old driver saved current as binder_proc.tsk in binder_open(). HIDL clients
+can initialize ProcessState on a temporary worker. After that worker exits,
+get_files_struct(proc->tsk) and get_task_mm(proc->tsk) stop resolving the still
+running process. Replies carrying allocator native-handle FDs then fail with
+BR_FAILED_REPLY. Gralloc2 maps the transport failure to NO_RESOURCES, and the
+GraphicBuffer caller sees -ENOMEM even with ample free memory.
+
+On OTA 17, a 1280x112 RGBA GraphicBuffer test gave:
+  main-thread initialization: allocation succeeds;
+  worker initialization, worker alive: both allocations succeed;
+  worker initialization, worker joined: initial allocation succeeds, next -12.
+The last case matches failed allocator replies and SystemUI's recents crash.
+The test is diagnostics/20260909-recents/hwbinder_lifetime.cpp in the workspace;
+baseline outputs are lifetime-test17/. It neither pressures memory nor modifies
+the HAL. Actual UI reproduction is repro17-settings/.
+
+Keep current->group_leader in binder_proc.tsk and permit mmap from a thread of
+that same thread group. The existing put_task_struct remains the matching
+release. Other processes, including forked children with inherited Binder FDs,
+remain forbidden from mmap. FD limits and security hooks still use the owning
+process; 32-bit Binder protocol 7, FDA layout and buffer ownership are unchanged.
+
+This is separate from the Tegra EGL teardown problem. Independent EGL tests
+show that eglTerminate followed by eglReleaseThread breaks reinitialization;
+either operation alone succeeds. OTA 18 narrows the hwui workaround to skipping
+eglReleaseThread while still terminating the display and destroying contexts.
+Do not treat zram or swallowed EGL errors as a fix for this dead-thread
+reference. Post-fix results must include the exited-worker comparison and actual
+app-to-recents transitions on a flashed kernel.
