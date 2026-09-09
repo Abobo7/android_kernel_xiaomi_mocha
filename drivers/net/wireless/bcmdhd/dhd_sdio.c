@@ -7961,8 +7961,14 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 						dhdsdio_release_dongle(bus, bus->dhd->osh,
 							TRUE, FALSE);
 					}
-				} else
+				} else {
 					bcmerror = BCME_SDIO_ERROR;
+					/* A download failure leaves dongle_reset set. The
+					 * normal power-off path therefore cannot detach this
+					 * newly allocated SI handle before the next retry.
+					 */
+					dhdsdio_release_dongle(bus, bus->dhd->osh, TRUE, FALSE);
+				}
 			} else
 				bcmerror = BCME_SDIO_ERROR;
 

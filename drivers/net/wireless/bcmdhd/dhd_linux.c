@@ -5305,10 +5305,12 @@ dhd_os_open_image(char *filename)
 	 * fp = open_namei(AT_FDCWD, filename, O_RD, 0);
 	 * ???
 	 */
-	 if (IS_ERR(fp))
-		 fp = NULL;
+	if (IS_ERR(fp)) {
+		DHD_ERROR(("%s: cannot open %s: %ld\n", __FUNCTION__, filename, PTR_ERR(fp)));
+		fp = NULL;
+	}
 
-	 return fp;
+	return fp;
 }
 
 int

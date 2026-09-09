@@ -21,6 +21,7 @@
 #include <linux/spinlock.h>
 #include <linux/irq.h>
 #include <linux/hrtimer.h>
+#include <linux/time.h>
 #include <linux/firmware.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/buffer.h>
@@ -33,6 +34,19 @@
 
 #include "st_sensor_hub.h"
 #include "st_hub_ymodem.h"
+
+/* Android sensor events use CLOCK_BOOTTIME, including time in suspend.
+ * The 3.10 iio_get_time_ns() helper uses wall time and produces timestamps
+ * decades ahead of SystemClock.elapsedRealtimeNanos(). Keep this change local
+ * to the Android sensor hub instead of changing the clock of every IIO device.
+ */
+static int64_t st_hub_get_time_ns(void)
+{
+	struct timespec ts;
+
+	get_monotonic_boottime(&ts);
+	return timespec_to_ns(&ts);
+}
 
 #define MS_TO_NS(msec)					((msec) * 1000 * 1000)
 #define ST_HUB_TOGGLE_DURATION_MS			(20)
@@ -937,7 +951,7 @@ static irqreturn_t st_hub_get_timestamp(int irq, void *private)
 	struct st_hub_data *hdata = private;
 
 	spin_lock_irqsave(&hdata->timestamp_lock, flags);
-	hdata->timestamp = iio_get_time_ns();
+	hdata->timestamp = st_hub_get_time_ns();
 	spin_unlock_irqrestore(&hdata->timestamp_lock, flags);
 
 	return IRQ_WAKE_THREAD;
@@ -1103,7 +1117,7 @@ int st_hub_set_enable(struct i2c_client *client, unsigned int index,
 			if ((!hdata->en_batch_sensor) && new_batch_status) {
 				hrtimer_start(&hdata->fifo_timer,
 					hdata->fifo_ktime, HRTIMER_MODE_REL);
-				hdata->timestamp_fifo = iio_get_time_ns();
+				hdata->timestamp_fifo = st_hub_get_time_ns();
 				new_sensor_status |= ST_FIFO_MASK;
 			}
 
@@ -1205,7 +1219,7 @@ static int st_hub_read_configuration_data(struct i2c_client *client)
 	if (err < 0)
 		goto st_hub_config_free_fw_version;
 
-	hdata->timestamp_sync = iio_get_time_ns();
+	hdata->timestamp_sync = st_hub_get_time_ns();
 
 	command[0] = ST_HUB_GLOBAL_FIFO_SIZE;
 	err = st_hub_send_and_receive(hdata, command, 1, data, 4, true);
@@ -2046,7 +2060,7 @@ static int st_sensor_hub_resume(struct device *dev)
 	if (hdata->en_batch_sensor) {
 		hrtimer_start(&hdata->fifo_timer,
 					hdata->fifo_ktime, HRTIMER_MODE_REL);
-		hdata->timestamp_fifo = iio_get_time_ns();
+		hdata->timestamp_fifo = st_hub_get_time_ns();
 	}
 
 	return 0;

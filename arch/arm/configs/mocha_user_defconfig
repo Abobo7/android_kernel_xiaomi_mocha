@@ -1795,7 +1795,7 @@ CONFIG_WIFI_CONTROL_FUNC=y
 CONFIG_BCMDHD=y
 CONFIG_BCMDHD_SDIO=y
 CONFIG_BCM4354=y
-CONFIG_BCMDHD_FW_PATH="/etc/firmware/fw_bcmdhd.bin"
+CONFIG_BCMDHD_FW_PATH="/vendor/firmware/fw_bcmdhd.bin"
 CONFIG_BCMDHD_NVRAM_PATH="/etc/firmware/nvram.txt"
 # CONFIG_DHD_USE_STATIC_BUF is not set
 # CONFIG_DHD_USE_SCHED_SCAN is not set

@@ -704,14 +704,31 @@ int wl_android_wifi_on(struct net_device *dev)
 		}
 #ifdef BCMSDIO
 		ret = dhd_net_bus_devreset(dev, FALSE);
-		dhd_net_bus_resume(dev, 1);
+		/* Stage 1 enables the OOB IRQ. A failed firmware download has
+		 * not registered its handler, so never enable it on that path.
+		 */
+		if (ret)
+			goto power_off;
+		ret = dhd_net_bus_resume(dev, 1);
+		if (ret)
+			goto power_off;
 #endif
 		if (!ret) {
 			if (dhd_dev_init_ioctl(dev) < 0)
 				ret = -EFAULT;
 		}
+		if (ret)
+			goto power_off;
 		g_wifi_on = TRUE;
 	}
+	goto exit;
+
+power_off:
+#ifdef BCMSDIO
+	dhd_net_bus_devreset(dev, TRUE);
+	dhd_net_bus_suspend(dev);
+#endif
+	dhd_net_wifi_platform_set_power(dev, FALSE, WIFI_TURNOFF_DELAY);
 
 exit:
 	dhd_net_if_unlock(dev);
