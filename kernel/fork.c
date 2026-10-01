@@ -12,6 +12,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/cpufreq_times.h>
 #include <linux/init.h>
 #include <linux/unistd.h>
 #include <linux/module.h>
@@ -210,6 +211,7 @@ static void account_kernel_stack(struct thread_info *ti, int account)
 
 void free_task(struct task_struct *tsk)
 {
+	cpufreq_task_times_free(tsk);
 	account_kernel_stack(tsk->stack, -1);
 	arch_release_thread_info(tsk->stack);
 	free_thread_info(tsk->stack);
@@ -438,7 +440,7 @@ static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 				atomic_dec(&inode->i_writecount);
 			mutex_lock(&mapping->i_mmap_mutex);
 			if (tmp->vm_flags & VM_SHARED)
-				mapping->i_mmap_writable++;
+				atomic_inc(&mapping->i_mmap_writable);
 			flush_dcache_mmap_lock(mapping);
 			/* insert tmp into the share list, just after mpnt */
 			if (unlikely(tmp->vm_flags & VM_NONLINEAR))

@@ -82,6 +82,7 @@ struct ion_device {
  * as well as the handles themselves, and should be held while modifying either.
  */
 struct ion_client {
+	struct kref ref;
 	struct rb_node node;
 	struct ion_device *dev;
 	struct rb_root handles;
@@ -339,7 +340,7 @@ static void ion_buffer_remove_from_handle(struct ion_buffer *buffer)
 	mutex_unlock(&buffer->lock);
 }
 
-static struct ion_handle *ion_handle_create(struct ion_client *client,
+struct ion_handle *ion_handle_create(struct ion_client *client,
 				     struct ion_buffer *buffer)
 {
 	struct ion_handle *handle;
@@ -434,14 +435,14 @@ static struct ion_handle *ion_handle_get_by_id(struct ion_client *client,
 	return handle ? handle : ERR_PTR(-EINVAL);
 }
 
-static bool ion_handle_validate(struct ion_client *client,
+bool ion_handle_validate(struct ion_client *client,
 				struct ion_handle *handle)
 {
 	WARN_ON(!mutex_is_locked(&client->lock));
 	return (idr_find(&client->idr, handle->id) == handle);
 }
 
-static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
+int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 {
 	int id;
 	struct rb_node **p = &client->handles.rb_node;
@@ -674,7 +675,8 @@ void ion_unmap_kernel(struct ion_client *client, struct ion_handle *handle)
 }
 EXPORT_SYMBOL(ion_unmap_kernel);
 
-struct scatterlist *iommu_heap_remap_dma(struct ion_heap *heap,
+#ifdef CONFIG_ION_IOMMU
+int iommu_heap_remap_dma(struct ion_heap *heap,
 					      struct ion_buffer *buf,
 					      unsigned long addr);
 int ion_remap_dma(struct ion_client *client,
@@ -699,6 +701,14 @@ int ion_remap_dma(struct ion_client *client,
 	mutex_unlock(&client->lock);
 	return ret;
 }
+#else
+/* The system heap has no fixed-I/O-address remapping operation. */
+int ion_remap_dma(struct ion_client *client, struct ion_handle *handle,
+		  unsigned long addr)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 
 static int ion_debug_client_show(struct seq_file *s, void *unused)
 {
@@ -790,6 +800,7 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 	if (!client)
 		goto err_put_task_struct;
 
+	kref_init(&client->ref);
 	client->dev = dev;
 	client->handles = RB_ROOT;
 	idr_init(&client->idr);
@@ -846,8 +857,9 @@ err_put_task_struct:
 }
 EXPORT_SYMBOL(ion_client_create);
 
-void ion_client_destroy(struct ion_client *client)
+static void ion_client_release(struct kref *ref)
 {
+	struct ion_client *client = container_of(ref, struct ion_client, ref);
 	struct ion_device *dev = client->dev;
 	struct rb_node *n;
 
@@ -870,6 +882,24 @@ void ion_client_destroy(struct ion_client *client)
 	kfree(client->display_name);
 	kfree(client->name);
 	kfree(client);
+}
+/* A client obtained from an ION file must outlive the fget/fput pair.
+ * The creating file/kernel caller owns the initial reference; additional
+ * clients release their references through ion_client_put().
+ */
+void ion_client_get(struct ion_client *client)
+{
+	kref_get(&client->ref);
+}
+
+int ion_client_put(struct ion_client *client)
+{
+	return kref_put(&client->ref, ion_client_release);
+}
+
+void ion_client_destroy(struct ion_client *client)
+{
+	ion_client_put(client);
 }
 EXPORT_SYMBOL(ion_client_destroy);
 

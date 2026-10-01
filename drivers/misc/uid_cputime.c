@@ -1,3 +1,4 @@
+#include <linux/cpufreq_times.h>
 /* drivers/misc/uid_cputime.c
  *
  * Copyright (C) 2014 - 2015 Google, Inc.
@@ -174,6 +175,8 @@ static ssize_t uid_remove_write(struct file *file,
 		kstrtol(end_uid, 10, &uid_end) != 0) {
 		return -EINVAL;
 	}
+	if (uid_start >= 0 && uid_end >= uid_start && uid_end <= UINT_MAX)
+		cpufreq_uid_times_remove(uid_start, uid_end);
 	mutex_lock(&uid_lock);
 
 	for (; uid_start <= uid_end; uid_start++) {

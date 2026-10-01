@@ -305,8 +305,14 @@ int proc_fd_permission(struct inode *inode, int mask)
 	int rv = generic_permission(inode, mask);
 	if (rv == 0)
 		return 0;
-	if (task_pid(current) == proc_pid(inode))
-		rv = 0;
+	/* Threads share the process fd table even when the process is not dumpable. */
+	rcu_read_lock();
+	{
+		struct task_struct *task = pid_task(proc_pid(inode), PIDTYPE_PID);
+		if (task && same_thread_group(current, task))
+			rv = 0;
+	}
+	rcu_read_unlock();
 	return rv;
 }
 

@@ -2700,6 +2700,28 @@ static int __init proc_vmalloc_init(void)
 }
 module_init(proc_vmalloc_init);
 
+unsigned long get_vmalloc_phys_size(void)
+{
+	struct vmap_area *va;
+	unsigned long pages = 0;
+
+	spin_lock(&vmap_area_lock);
+	list_for_each_entry(va, &vmap_area_list, list) {
+		struct vm_struct *vm;
+		if (!(va->flags & VM_VM_AREA) ||
+		    (va->flags & (VM_LAZY_FREE | VM_LAZY_FREEING)))
+			continue;
+		vm = va->vm;
+		if (!vm || (vm->flags & VM_UNLIST))
+			continue;
+		/* Pair with clear_vm_unlist() after allocating the backing pages. */
+		smp_rmb();
+		pages += vm->nr_pages;
+	}
+	spin_unlock(&vmap_area_lock);
+	return pages << PAGE_SHIFT;
+}
+
 void get_vmalloc_info(struct vmalloc_info *vmi)
 {
 	struct vmap_area *va;

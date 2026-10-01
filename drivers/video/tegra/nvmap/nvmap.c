@@ -277,9 +277,19 @@ void *__nvmap_mmap(struct nvmap_handle *h)
 
 	prot = nvmap_pgprot(h, pgprot_kernel);
 
-	if (h->heap_pgalloc)
-		return vm_map_ram(h->pgalloc.pages, h->size >> PAGE_SHIFT,
-				  -1, prot);
+	if (h->heap_pgalloc) {
+		/*
+		 * DMA-buf mappings may outlive a submission. vm_map_ram() uses
+		 * per-CPU blocks for small buffers, requiring a 2 MiB aligned
+		 * hole on this 32-bit platform even for a single command page.
+		 * Use a mapping sized to the handle so fragmented vmalloc space
+		 * does not prevent the AVP from mapping its command buffers.
+		 */
+		p = vmap(h->pgalloc.pages, h->size >> PAGE_SHIFT, VM_MAP, prot);
+		if (!p)
+			nvmap_handle_put(h);
+		return p;
+	}
 
 	/* carveout - explicitly map the pfns into a vmalloc area */
 
@@ -349,7 +359,7 @@ void __nvmap_munmap(struct nvmap_handle *h, void *addr)
 	/* Handle can be locked by cache maintenance in
 	 * separate thread */
 	if (h->heap_pgalloc) {
-		vm_unmap_ram(addr, h->size >> PAGE_SHIFT);
+		vunmap(addr);
 	} else {
 		struct vm_struct *vm;
 		addr -= (h->carveout->base & ~PAGE_MASK);

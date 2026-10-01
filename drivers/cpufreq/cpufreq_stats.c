@@ -14,6 +14,7 @@
 #include <linux/cpu.h>
 #include <linux/sysfs.h>
 #include <linux/cpufreq.h>
+#include <linux/cpufreq_times.h>
 #include <linux/module.h>
 #include <linux/jiffies.h>
 #include <linux/percpu.h>
@@ -142,6 +143,7 @@ void acct_update_power(struct task_struct *task, cputime_t cputime) {
 
 	if (!task)
 		return;
+	cpufreq_task_times_account(task, cputime);
 	cpu_num = task_cpu(task);
 	powerstats = per_cpu(cpufreq_power_stats, cpu_num);
 	stats = per_cpu(cpufreq_stats_table, cpu_num);
@@ -441,6 +443,7 @@ static int cpufreq_stats_create_table(struct cpufreq_policy *policy,
 		j++;
 	}
 	stat->state_num = j;
+	cpufreq_times_register(policy, table);
 	spin_lock(&cpufreq_stats_lock);
 	stat->last_time = get_jiffies_64();
 	stat->last_index = freq_table_get_index(stat, policy->cur);
@@ -641,6 +644,7 @@ static int cpufreq_stat_notifier_policy(struct notifier_block *nb,
 			cpufreq_powerstats_create(cpu_num, table, count);
 	}
 
+	cpufreq_times_register(policy, table);
 	ret = cpufreq_stats_create_table(policy, table, count);
 	if (ret)
 		return ret;
@@ -657,6 +661,7 @@ static int cpufreq_stat_notifier_trans(struct notifier_block *nb,
 	if (val != CPUFREQ_POSTCHANGE)
 		return 0;
 
+	cpufreq_times_transition(freq->cpu, freq->new);
 	cpufreq_stats_update(freq->cpu);
 
 	spin_lock(&cpufreq_stats_lock);
@@ -714,6 +719,7 @@ static int cpufreq_stats_create_table_cpu(unsigned int cpu)
 			cpufreq_powerstats_create(cpu_num, table, count);
 	}
 
+	cpufreq_times_register(policy, table);
 	ret = cpufreq_stats_create_table(policy, table, count);
 
 out:

@@ -69,6 +69,10 @@ lookup_exec_domain(unsigned int personality)
 	}
 
 #ifdef CONFIG_MODULES
+	if (pers == PER_LINUX32) {
+		ep = &default_exec_domain;
+		goto out;
+	}
 	read_unlock(&exec_domains_lock);
 	request_module("personality-%d", pers);
 	read_lock(&exec_domains_lock);

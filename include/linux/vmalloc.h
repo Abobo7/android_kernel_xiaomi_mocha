@@ -178,9 +178,11 @@ struct vmalloc_info {
 #ifdef CONFIG_MMU
 #define VMALLOC_TOTAL (VMALLOC_END - VMALLOC_START)
 extern void get_vmalloc_info(struct vmalloc_info *vmi);
+extern unsigned long get_vmalloc_phys_size(void);
 #else
 
 #define VMALLOC_TOTAL 0UL
+static inline unsigned long get_vmalloc_phys_size(void) { return 0; }
 #define get_vmalloc_info(vmi)			\
 do {						\
 	(vmi)->used = 0;			\

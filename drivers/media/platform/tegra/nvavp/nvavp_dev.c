@@ -1547,9 +1547,9 @@ static int nvavp_pushbuffer_submit_ioctl(struct file *filp, unsigned int cmd,
 	phys_addr = sg_dma_address(cmdbuf_sgt->sgl);
 
 	virt_addr = (unsigned long)dma_buf_vmap(cmdbuf_dmabuf);
-	if (!virt_addr) {
+	if (IS_ERR_OR_NULL((void *)virt_addr)) {
 		dev_err(&nvavp->nvhost_dev->dev, "cannot vmap cmdbuf_dmabuf\n");
-		ret = -ENOMEM;
+		ret = virt_addr ? PTR_ERR((void *)virt_addr) : -ENOMEM;
 		goto err_dmabuf_vmap;
 	}
 

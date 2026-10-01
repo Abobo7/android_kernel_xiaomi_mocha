@@ -39,6 +39,7 @@
 #include <linux/resource.h>
 #include <linux/security.h>
 #include <linux/stat.h>
+#include <linux/sort.h>
 
 #include <asm/cputype.h>
 #include <asm/cacheflush.h>
@@ -1133,6 +1134,143 @@ static int nvmap_debug_iovmm_procrank_show(struct seq_file *s, void *unused)
 
 DEBUGFS_OPEN_FOPS(iovmm_procrank);
 
+/* Read-only accounting for the stock nvmap allocator. No allocation policy changes. */
+struct nvmap_memtrack_ref {
+ struct nvmap_handle *handle;
+ pid_t pid;
+};
+struct nvmap_memtrack_client {
+ struct nvmap_client *client;
+ struct nvmap_memtrack_ref *refs;
+ size_t count;
+};
+static int nvmap_memtrack_cmp(const void *a, const void *b)
+{
+ const struct nvmap_memtrack_ref *x = a, *y = b;
+ if (x->handle != y->handle)
+  return (unsigned long)x->handle < (unsigned long)y->handle ? -1 : 1;
+ return x->pid < y->pid ? -1 : x->pid != y->pid;
+}
+static int nvmap_debug_memtrack_show(struct seq_file *s, void *unused)
+{
+ struct nvmap_device *dev = s->private;
+ struct nvmap_client *c;
+ struct nvmap_memtrack_client *clients;
+ struct nvmap_memtrack_ref *refs = NULL;
+ size_t capacity = 16, count = 0, total = 0, i, j, k;
+ int err = 0;
+ /* Take live client references under the list spinlock, then drop it before
+  * taking any mutex or allocating. Never sleep with clients_lock held. */
+ spin_lock(&dev->clients_lock);
+ list_for_each_entry(c, &dev->clients, list)
+  capacity++;
+ spin_unlock(&dev->clients_lock);
+ clients = kcalloc(capacity, sizeof(*clients), GFP_KERNEL);
+ if (!clients)
+  return -ENOMEM;
+ spin_lock(&dev->clients_lock);
+ list_for_each_entry(c, &dev->clients, list) {
+  if (count == capacity) {
+   err = -EAGAIN;
+   break;
+  }
+  if (nvmap_client_get(c))
+   clients[count++].client = c;
+ }
+ spin_unlock(&dev->clients_lock);
+ if (err)
+  goto out;
+ for (i = 0; i < count; i++) {
+  struct rb_node *n;
+  size_t nr = 0;
+  c = clients[i].client;
+  nvmap_ref_lock(c);
+  for (n = rb_first(&c->handle_refs); n; n = rb_next(n))
+   nr++;
+  if (nr) {
+   clients[i].refs = vmalloc(nr * sizeof(*refs));
+   if (!clients[i].refs) {
+    nvmap_ref_unlock(c);
+    err = -ENOMEM;
+    goto out;
+   }
+  }
+  for (n = rb_first(&c->handle_refs); n; n = rb_next(n)) {
+   struct nvmap_handle_ref *ref = rb_entry(n, struct nvmap_handle_ref, node);
+   struct nvmap_handle *h = nvmap_handle_get(ref->handle);
+   if (h) {
+    j = clients[i].count++;
+    clients[i].refs[j].handle = h;
+    clients[i].refs[j].pid = c->task ? task_tgid_nr(c->task) : 0;
+   }
+  }
+  nvmap_ref_unlock(c);
+  total += clients[i].count;
+ }
+ if (total) {
+  refs = vmalloc(total * sizeof(*refs));
+  if (!refs) {
+   err = -ENOMEM;
+   goto out;
+  }
+ }
+ k = 0;
+ for (i = 0; i < count; i++) {
+  if (clients[i].count)
+   memcpy(refs + k, clients[i].refs, clients[i].count * sizeof(*refs));
+  k += clients[i].count;
+ }
+ if (total)
+  sort(refs, total, sizeof(*refs), nvmap_memtrack_cmp, NULL);
+ seq_puts(s, "nvmap_memtrack_v1\n");
+ for (i = 0; i < total; i = j) {
+  struct nvmap_handle *h = refs[i].handle;
+  unsigned long unaccounted = 0, page;
+  bool system, secure;
+  size_t size;
+  for (j = i + 1; j < total && refs[j].handle == h; j++)
+   ;
+  mutex_lock(&h->lock);
+  if (!h->alloc) {
+   mutex_unlock(&h->lock);
+   continue;
+  }
+  size = h->size;
+  system = h->heap_pgalloc || pfn_valid(h->carveout->base >> PAGE_SHIFT);
+  secure = h->secure;
+  if (system) {
+   /* Fault-inserted pages with mappings are already charged by smaps.
+    * Only pages unmapped in EVERY process are added to memtrack PSS. */
+   for (page = 0; page < size >> PAGE_SHIFT; page++)
+    if (!page_mapcount(h->heap_pgalloc ? h->pgalloc.pages[page] :
+     pfn_to_page((h->carveout->base >> PAGE_SHIFT) + page)))
+     unaccounted += PAGE_SIZE;
+  } else {
+   /* Non-RAM carveouts use PFN mappings, absent from smaps RSS. */
+   unaccounted = size;
+  }
+  mutex_unlock(&h->lock);
+  for (k = i; k < j; k++) {
+   if (k != i && refs[k].pid == refs[k - 1].pid)
+    continue;
+   /* Snapshot-local numeric ID; never export a kernel address. */
+   seq_printf(s, "%zu %d %zu %lu %u %u\n", i + 1,
+    refs[k].pid, size, unaccounted, system, secure);
+  }
+ }
+out:
+ vfree(refs);
+ for (i = 0; i < count; i++) {
+  for (j = 0; j < clients[i].count; j++)
+   nvmap_handle_put(clients[i].refs[j].handle);
+  vfree(clients[i].refs);
+  nvmap_client_put(clients[i].client);
+ }
+ kfree(clients);
+ return err;
+}
+DEBUGFS_OPEN_FOPS(memtrack);
+
 ulong nvmap_iovmm_get_used_pages(void)
 {
 	u64 total;
@@ -1278,6 +1416,8 @@ static int nvmap_probe(struct platform_device *pdev)
 	}
 
 	nvmap_debug_root = debugfs_create_dir("nvmap", NULL);
+	debugfs_create_file("memtrack", S_IRUSR | S_IRGRP, nvmap_debug_root,
+		dev, &debug_memtrack_fops);
 	if (IS_ERR_OR_NULL(nvmap_debug_root))
 		dev_err(&pdev->dev, "couldn't create debug files\n");
 

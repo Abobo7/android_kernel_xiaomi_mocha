@@ -42,12 +42,23 @@
 #include <linux/skbuff.h>
 #include <linux/workqueue.h>
 #include <linux/sysfs.h>
+#include <linux/time.h>
+#include <linux/spinlock.h>
 #include <net/net_namespace.h>
+#include <net/sock.h>
+#include <linux/ratelimit.h>
 
 struct idletimer_tg_attr {
 	struct attribute attr;
 	ssize_t	(*show)(struct kobject *kobj,
 			struct attribute *attr, char *buf);
+};
+
+struct idletimer_event {
+	struct list_head entry;
+	struct timespec time;
+	bool active;
+	int uid;
 };
 
 struct idletimer_tg {
@@ -61,6 +72,8 @@ struct idletimer_tg {
 	unsigned int refcnt;
 	bool send_nl_msg;
 	bool active;
+	spinlock_t state_lock;
+	struct list_head events;
 };
 
 static LIST_HEAD(idletimer_tg_list);
@@ -68,30 +81,37 @@ static DEFINE_MUTEX(list_mutex);
 
 static struct kobject *idletimer_tg_kobj;
 
-static void notify_netlink_uevent(const char *label, struct idletimer_tg *timer)
+static void notify_netlink_uevent(const char *label,
+				  const struct idletimer_event *event)
 {
-	char label_msg[NLMSG_MAX_SIZE];
-	char state_msg[NLMSG_MAX_SIZE];
-	char *envp[] = { label_msg, state_msg, NULL };
-	int res;
+	char label_msg[NLMSG_MAX_SIZE], interface_msg[NLMSG_MAX_SIZE];
+	char state_msg[NLMSG_MAX_SIZE], time_msg[NLMSG_MAX_SIZE];
+	char uid_msg[NLMSG_MAX_SIZE];
+	char *envp[] = { label_msg, interface_msg, state_msg, time_msg, uid_msg, NULL };
 
-	res = snprintf(label_msg, NLMSG_MAX_SIZE, "LABEL=%s",
-		       label);
-	if (NLMSG_MAX_SIZE <= res) {
-		pr_err("message too long (%d)", res);
-		return;
-	}
-	res = snprintf(state_msg, NLMSG_MAX_SIZE, "STATE=%s",
-		       timer->active ? "active" : "inactive");
-	if (NLMSG_MAX_SIZE <= res) {
-		pr_err("message too long (%d)", res);
-		return;
-	}
-	pr_debug("putting nlmsg: <%s> <%s>\n", label_msg, state_msg);
+	snprintf(label_msg, sizeof(label_msg), "LABEL=%s", label);
+	snprintf(interface_msg, sizeof(interface_msg), "INTERFACE=%s", label);
+	snprintf(state_msg, sizeof(state_msg), "STATE=%s", event->active ? "active" : "inactive");
+	snprintf(time_msg, sizeof(time_msg), "TIME_NS=%lld",
+		 (long long)timespec_to_ns(&event->time));
+	snprintf(uid_msg, sizeof(uid_msg), "UID=%d", event->uid);
 	kobject_uevent_env(idletimer_tg_kobj, KOBJ_CHANGE, envp);
-	return;
+}
 
+/* Called under state_lock. At most two transitions per timeout period. */
+static void idletimer_queue_event(struct idletimer_tg *timer, int uid)
+{
+	struct idletimer_event *event = kmalloc(sizeof(*event), GFP_ATOMIC);
 
+	if (event) {
+		get_monotonic_boottime(&event->time);
+		event->active = timer->active;
+		event->uid = uid;
+		list_add_tail(&event->entry, &timer->events);
+	} else {
+		pr_warn_ratelimited("unable to allocate timer notification\n");
+	}
+	schedule_work(&timer->work);
 }
 
 static
@@ -112,48 +132,56 @@ struct idletimer_tg *__idletimer_tg_find_by_label(const char *label)
 static ssize_t idletimer_tg_show(struct kobject *kobj, struct attribute *attr,
 				 char *buf)
 {
-	struct idletimer_tg *timer;
-	unsigned long expires = 0;
-	unsigned long now = jiffies;
+	struct idletimer_tg *timer = container_of(attr, struct idletimer_tg, attr.attr);
+	unsigned long expires, flags, now = jiffies;
+	bool send_nl_msg;
 
-	mutex_lock(&list_mutex);
-
-	timer =	__idletimer_tg_find_by_label(attr->name);
-	if (timer)
-		expires = timer->timer.expires;
-
-	mutex_unlock(&list_mutex);
-
+	/* sysfs pins the attribute until show returns. Do not take list_mutex:
+	 * sysfs_remove_file() waits for show while destroy holds that mutex. */
+	spin_lock_irqsave(&timer->state_lock, flags);
+	expires = timer->timer.expires;
+	send_nl_msg = timer->send_nl_msg;
+	spin_unlock_irqrestore(&timer->state_lock, flags);
 	if (time_after(expires, now))
-		return sprintf(buf, "%u\n",
-			       jiffies_to_msecs(expires - now) / 1000);
-
-	if (timer->send_nl_msg)
-		return sprintf(buf, "0 %d\n",
-			jiffies_to_msecs(now - expires) / 1000);
-	else
-		return sprintf(buf, "0\n");
+		return sprintf(buf, "%u\n", jiffies_to_msecs(expires - now) / 1000);
+	if (send_nl_msg)
+		return sprintf(buf, "0 %u\n", jiffies_to_msecs(now - expires) / 1000);
+	return sprintf(buf, "0\n");
 }
 
 static void idletimer_tg_work(struct work_struct *work)
 {
-	struct idletimer_tg *timer = container_of(work, struct idletimer_tg,
-						  work);
+	struct idletimer_tg *timer = container_of(work, struct idletimer_tg, work);
+	struct idletimer_event *event;
+	unsigned long flags;
 
 	sysfs_notify(idletimer_tg_kobj, NULL, timer->attr.attr.name);
-
-	if (timer->send_nl_msg)
-		notify_netlink_uevent(timer->attr.attr.name, timer);
+	for (;;) {
+		spin_lock_irqsave(&timer->state_lock, flags);
+		if (list_empty(&timer->events)) {
+			spin_unlock_irqrestore(&timer->state_lock, flags);
+			break;
+		}
+		event = list_first_entry(&timer->events, struct idletimer_event, entry);
+		list_del(&event->entry);
+		spin_unlock_irqrestore(&timer->state_lock, flags);
+		if (timer->send_nl_msg)
+			notify_netlink_uevent(timer->attr.attr.name, event);
+		kfree(event);
+	}
 }
 
 static void idletimer_tg_expired(unsigned long data)
 {
-	struct idletimer_tg *timer = (struct idletimer_tg *) data;
+	struct idletimer_tg *timer = (struct idletimer_tg *)data;
+	unsigned long flags;
 
-	pr_debug("timer %s expired\n", timer->attr.attr.name);
-
-	timer->active = false;
-	schedule_work(&timer->work);
+	spin_lock_irqsave(&timer->state_lock, flags);
+	if (!time_after(timer->timer.expires, jiffies)) {
+		timer->active = false;
+		idletimer_queue_event(timer, -1);
+	}
+	spin_unlock_irqrestore(&timer->state_lock, flags);
 }
 
 static int idletimer_tg_create(struct idletimer_tg_info *info)
@@ -174,6 +202,15 @@ static int idletimer_tg_create(struct idletimer_tg_info *info)
 	info->timer->attr.attr.mode = S_IRUGO;
 	info->timer->attr.show = idletimer_tg_show;
 
+	setup_timer(&info->timer->timer, idletimer_tg_expired,
+		    (unsigned long) info->timer);
+	info->timer->refcnt = 1;
+	info->timer->send_nl_msg = (info->send_nl_msg == 0) ? false : true;
+	info->timer->active = true;
+	spin_lock_init(&info->timer->state_lock);
+	INIT_LIST_HEAD(&info->timer->events);
+	INIT_WORK(&info->timer->work, idletimer_tg_work);
+
 	ret = sysfs_create_file(idletimer_tg_kobj, &info->timer->attr.attr);
 	if (ret < 0) {
 		pr_debug("couldn't add file to sysfs");
@@ -182,16 +219,9 @@ static int idletimer_tg_create(struct idletimer_tg_info *info)
 
 	list_add(&info->timer->entry, &idletimer_tg_list);
 
-	setup_timer(&info->timer->timer, idletimer_tg_expired,
-		    (unsigned long) info->timer);
-	info->timer->refcnt = 1;
-	info->timer->send_nl_msg = (info->send_nl_msg == 0) ? false : true;
-	info->timer->active = true;
 
 	mod_timer(&info->timer->timer,
 		  msecs_to_jiffies(info->timeout * 1000) + jiffies);
-
-	INIT_WORK(&info->timer->work, idletimer_tg_work);
 
 	return 0;
 
@@ -217,17 +247,17 @@ static unsigned int idletimer_tg_target(struct sk_buff *skb,
 
 	BUG_ON(!info->timer);
 
-	info->timer->active = true;
-
-	if (time_before(info->timer->timer.expires, now)) {
-		schedule_work(&info->timer->work);
-		pr_debug("Starting timer %s (Expired, Jiffies): %lu, %lu\n",
-			 info->label, info->timer->timer.expires, now);
-	}
-
-	/* TODO: Avoid modifying timers on each packet */
-	mod_timer(&info->timer->timer,
-		  msecs_to_jiffies(info->timeout * 1000) + now);
+    {
+        unsigned long flags;
+        spin_lock_irqsave(&info->timer->state_lock, flags);
+        if (!info->timer->active) {
+            info->timer->active = true;
+            idletimer_queue_event(info->timer, skb->sk ?
+                (int)from_kuid_munged(&init_user_ns, sock_i_uid(skb->sk)) : -1);
+        }
+        mod_timer(&info->timer->timer, msecs_to_jiffies(info->timeout * 1000) + now);
+        spin_unlock_irqrestore(&info->timer->state_lock, flags);
+    }
 
 	return XT_CONTINUE;
 }
@@ -240,7 +270,7 @@ static int idletimer_tg_checkentry(const struct xt_tgchk_param *par)
 
 	pr_debug("checkentry targinfo %s\n", info->label);
 
-	if (info->timeout == 0) {
+	if (info->timeout == 0 || info->timeout > UINT_MAX / 1000) {
 		pr_debug("timeout value is zero\n");
 		return -EINVAL;
 	}
@@ -256,17 +286,19 @@ static int idletimer_tg_checkentry(const struct xt_tgchk_param *par)
 
 	info->timer = __idletimer_tg_find_by_label(info->label);
 	if (info->timer) {
-		info->timer->refcnt++;
-		info->timer->active = true;
-
-		if (time_before(info->timer->timer.expires, now)) {
-			schedule_work(&info->timer->work);
-			pr_debug("Starting Checkentry timer (Expired, Jiffies): %lu, %lu\n",
-				info->timer->timer.expires, now);
-		}
-
-		mod_timer(&info->timer->timer,
-			  msecs_to_jiffies(info->timeout * 1000) + now);
+        unsigned long flags;
+        if (info->timer->send_nl_msg != !!info->send_nl_msg) {
+            mutex_unlock(&list_mutex);
+            return -EINVAL;
+        }
+        info->timer->refcnt++;
+        spin_lock_irqsave(&info->timer->state_lock, flags);
+        if (!info->timer->active) {
+            info->timer->active = true;
+            idletimer_queue_event(info->timer, -1);
+        }
+        mod_timer(&info->timer->timer, msecs_to_jiffies(info->timeout * 1000) + now);
+        spin_unlock_irqrestore(&info->timer->state_lock, flags);
 
 		pr_debug("increased refcnt of timer %s to %u\n",
 			 info->label, info->timer->refcnt);
@@ -297,6 +329,13 @@ static void idletimer_tg_destroy(const struct xt_tgdtor_param *par)
 
 		list_del(&info->timer->entry);
 		del_timer_sync(&info->timer->timer);
+		cancel_work_sync(&info->timer->work);
+		while (!list_empty(&info->timer->events)) {
+			struct idletimer_event *event = list_first_entry(
+				&info->timer->events, struct idletimer_event, entry);
+			list_del(&event->entry);
+			kfree(event);
+		}
 		sysfs_remove_file(idletimer_tg_kobj, &info->timer->attr.attr);
 		kfree(info->timer->attr.attr.name);
 		kfree(info->timer);
